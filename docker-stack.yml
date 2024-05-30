@@ -1,0 +1,11 @@
+version: '3.9'
+services:
+  app:
+    image: ${APP_IMAGE:?}
+    ports:
+      - "${HOST_PORT:?}:${CONTAINER_PORT:?}"
+    environment:
+      SENTRY_DSN: ${SENTRY_DSN:?}
+      SERVER_ADDRESS: ${SERVER_ADDRESS:?}
+      AUTH_USER: ${AUTH_USER:?}
+      AUTH_PASS: ${AUTH_PASS:?}
