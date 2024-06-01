@@ -22,7 +22,7 @@ func TestSqliteRepository(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	channel := &chat.Channel{ID: uuid.New(), Name: `Name`, CreatedAt: time.Now()}
+	channel := &chat.Channel{ID: uuid.New(), Name: `Username`, CreatedAt: time.Now()}
 	t.Run("Test SaveChannel", func(t *testing.T) {
 		err := repo.SaveChannel(context.Background(), channel)
 		if err != nil {
@@ -64,15 +64,15 @@ func TestSqliteRepository(t *testing.T) {
 		}
 	})
 
-	username := &chat.Username{ID: uuid.New(), Name: `Name`, CreatedAt: time.Now()}
-	t.Run("Test SaveUsername", func(t *testing.T) {
-		err := repo.SaveUsername(context.Background(), username)
+	username := &chat.User{ID: uuid.New(), Username: `Username`, CreatedAt: time.Now()}
+	t.Run("Test SaveUser", func(t *testing.T) {
+		err := repo.SaveUser(context.Background(), username)
 		if err != nil {
 			t.Fatal(err)
 		}
 	})
-	t.Run("Test GetUsernames", func(t *testing.T) {
-		usernames, err := repo.GetUsernames(context.Background())
+	t.Run("Test GetUsers", func(t *testing.T) {
+		usernames, err := repo.GetUsers(context.Background())
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -20,10 +20,13 @@ type Channel struct {
 	CreatedAt time.Time
 }
 
-type Username struct {
-	ID        uuid.UUID
-	Name      string
-	CreatedAt time.Time
+type User struct {
+	ID           uuid.UUID
+	Username     string
+	AccessToken  string
+	RefreshToken string
+	ExpiresAt    time.Time
+	CreatedAt    time.Time
 }
 
 const (
@@ -50,8 +53,8 @@ type Repository interface {
 	SaveChannel(ctx context.Context, channel *Channel) error
 	GetChannel(ctx context.Context, id uuid.UUID) (*Channel, error)
 	DeleteChannel(ctx context.Context, id uuid.UUID) error
-	GetUsernames(ctx context.Context) ([]*Username, error)
-	SaveUsername(ctx context.Context, username *Username) error
-	DeleteUsername(ctx context.Context, id uuid.UUID) error
-	GetUsername(ctx context.Context, id uuid.UUID) (username *Username, err error)
+	GetUsers(ctx context.Context) ([]*User, error)
+	SaveUser(ctx context.Context, username *User) error
+	DeleteUser(ctx context.Context, id uuid.UUID) error
+	GetUser(ctx context.Context, id uuid.UUID) (user *User, err error)
 }
