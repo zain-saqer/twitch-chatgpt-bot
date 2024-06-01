@@ -5,14 +5,14 @@ import (
 	twitchirc "github.com/gempir/go-twitch-irc/v4"
 	"github.com/google/uuid"
 	"github.com/zain-saqer/twitch-chatgpt/internal/chat"
-	"github.com/zain-saqer/twitch-chatgpt/internal/irc"
+	"github.com/zain-saqer/twitch-chatgpt/internal/twitch"
 )
 
 type App struct {
 	Repository    chat.Repository
 	TwitchClient  *twitchirc.Client
-	WhitelistByID map[uuid.UUID]*chat.Username
-	Whitelist     map[string]*chat.Username
+	WhitelistByID map[uuid.UUID]*chat.User
+	Whitelist     map[string]*chat.User
 }
 
 func (a *App) JoinChannel(channel ...string) {
@@ -23,18 +23,18 @@ func (a *App) Depart(channel string) {
 	a.TwitchClient.Depart(channel)
 }
 
-func (a *App) AddUsername(username *chat.Username) {
-	a.Whitelist[username.Name] = username
+func (a *App) AddUsername(username *chat.User) {
+	a.Whitelist[username.Username] = username
 	a.WhitelistByID[username.ID] = username
 }
 
-func (a *App) RemoveUsername(username *chat.Username) {
-	delete(a.Whitelist, username.Name)
+func (a *App) RemoveUsername(username *chat.User) {
+	delete(a.Whitelist, username.Username)
 	delete(a.WhitelistByID, username.ID)
 }
 
 func (a *App) StartMessagePipeline(ctx context.Context) error {
-	usernames, err := a.Repository.GetUsernames(ctx)
+	usernames, err := a.Repository.GetUsers(ctx)
 	if err != nil {
 		return err
 	}
@@ -49,11 +49,11 @@ func (a *App) StartMessagePipeline(ctx context.Context) error {
 		a.JoinChannel(channel.Name)
 	}
 	messageTypes := []uint8{chat.PrivMsg}
-	messageStream, err := irc.NewMessagePipeline(a.TwitchClient)(ctx, messageTypes)
+	messageStream, err := twitch.NewMessagePipeline(a.TwitchClient)(ctx, messageTypes)
 	if err != nil {
 		return err
 	}
 	filteredMessageStream := chat.FilterMessageStream(ctx, messageStream, messageTypes)
-	chat.ServeMessageStream(ctx, filteredMessageStream, func() map[string]*chat.Username { return a.Whitelist })
+	chat.ServeMessageStream(ctx, filteredMessageStream, func() map[string]*chat.User { return a.Whitelist })
 	return nil
 }

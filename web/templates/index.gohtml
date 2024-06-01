@@ -7,7 +7,7 @@
         </div>
         <div class="row">
             <div class="col-lg-6">
-                {{template `usernames` .Usernames}}
+                {{template `users` .Users}}
             </div>
         </div>
     </div>
@@ -28,17 +28,17 @@
     {{end}}
 {{end}}
 
-{{define `usernames`}}
-        <h3>Username whitelist</h3>
+{{define `users`}}
+        <h3>Users</h3>
         <p>
-            <a class="btn btn-secondary btn-sm" href="/add-username">Add channel</a>
+            <a class="btn btn-secondary btn-sm" href="/add-user">Add channel</a>
         </p>
     <ul>
         {{range .}}
-            <li>{{.Name}} <button class="btn btn-text" hx-delete="/usernames/{{.ID}}">Remove</button></li>
+            <li>{{.Username}} <button class="btn btn-text" hx-delete="/users/{{.ID}}">Remove</button></li>
         {{end}}
     </ul>
     {{if not .}}
-        <p class="text-mute">No usernames</p>
+        <p class="text-mute">No users</p>
     {{end}}
 {{end}}

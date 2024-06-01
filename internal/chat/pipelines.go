@@ -31,7 +31,7 @@ func FilterMessageStream(ctx context.Context, messageStream <-chan *Message, all
 	return filteredMessageStream
 }
 
-func ServeMessageStream(ctx context.Context, messagesStream <-chan *Message, getWhiteList func() map[string]*Username) {
+func ServeMessageStream(ctx context.Context, messagesStream <-chan *Message, getWhiteList func() map[string]*User) {
 	go func() {
 		for {
 			select {

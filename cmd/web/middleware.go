@@ -3,6 +3,8 @@ package main
 import (
 	"crypto/subtle"
 	sentryecho "github.com/getsentry/sentry-go/echo"
+	"github.com/gorilla/sessions"
+	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/rs/zerolog/log"
@@ -11,6 +13,7 @@ import (
 func (s *Server) middlewares() {
 	s.Echo.Use(middleware.Recover())
 	s.Echo.Use(loggerMiddleware())
+	s.Echo.Use(session.Middleware(sessions.NewCookieStore([]byte(s.Config.Secret))))
 	s.Echo.Use(sentryecho.New(sentryecho.Options{Repanic: true, WaitForDelivery: true}))
 }
 

@@ -7,13 +7,17 @@ import (
 	"github.com/gempir/go-twitch-irc/v4"
 	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
+	"github.com/gorilla/sessions"
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/zain-saqer/twitch-chatgpt/internal/bot"
 	"github.com/zain-saqer/twitch-chatgpt/internal/chat"
 	"github.com/zain-saqer/twitch-chatgpt/internal/db"
+	"golang.org/x/oauth2"
+	oauth2Twitch "golang.org/x/oauth2/twitch"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"sync"
@@ -53,8 +57,8 @@ func main() {
 	app := &bot.App{
 		Repository:    repo,
 		TwitchClient:  twitchIrcClient,
-		Whitelist:     map[string]*chat.Username{},
-		WhitelistByID: map[uuid.UUID]*chat.Username{},
+		Whitelist:     map[string]*chat.User{},
+		WhitelistByID: map[uuid.UUID]*chat.User{},
 	}
 	if err := app.StartMessagePipeline(ctx); err != nil {
 		sentry.CaptureException(err)
@@ -62,7 +66,20 @@ func main() {
 	}
 	e := echo.New()
 	e.Debug = config.Debug
-	server := NewServer(app, e, config)
+	cookieStore := sessions.NewCookieStore([]byte(config.Secret))
+	oauthRedirect, err := url.JoinPath(config.Domain, `/add-user/redirect`)
+	if err != nil {
+		sentry.CaptureException(err)
+		log.Fatal().Err(err).Stack().Msg(`error creating oauth redirect URL`)
+	}
+	oauth2Config := &oauth2.Config{
+		ClientID:     config.Oauth2ClientID,
+		ClientSecret: config.Oauth2Secret,
+		Scopes:       []string{"user:read:email"},
+		Endpoint:     oauth2Twitch.Endpoint,
+		RedirectURL:  oauthRedirect,
+	}
+	server := NewServer(app, e, config, cookieStore, oauth2Config)
 	server.middlewares()
 	server.setupRoutes()
 

@@ -16,14 +16,15 @@ import (
 )
 
 func (s *Server) setupRoutes() {
-	adminGroup := s.Echo.Group(`/`, authMiddleware(s.Config))
-	adminGroup.GET(``, s.getIndex)
-	adminGroup.GET(`add-channel`, s.getAdminAddChannel)
-	adminGroup.POST(`add-channel`, s.postAdminAddChannel)
-	adminGroup.DELETE(`channels/:id`, s.deleteAdminDeleteChannel)
-	adminGroup.GET(`add-username`, s.getAdminAddUsername)
-	adminGroup.POST(`add-username`, s.postAdminAddUsername)
-	adminGroup.DELETE(`usernames/:id`, s.deleteAdminDeleteUsername)
+	route := s.Echo.Group(`/`, authMiddleware(s.Config))
+	route.GET(``, s.getIndex)
+	route.GET(`add-channel`, s.getAdminAddChannel)
+	route.POST(`add-channel`, s.postAdminAddChannel)
+	route.DELETE(`channels/:id`, s.deleteAdminDeleteChannel)
+	route.DELETE(`users/:id`, s.deleteAdminDeleteUser)
+
+	route.GET(`add-user`, s.getAddUser)
+	route.GET(`add-user/redirect`, s.getOAuth2Callback)
 }
 
 func (s *Server) getIndex(c echo.Context) error {
@@ -40,11 +41,11 @@ func (s *Server) getIndex(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	usernames, err := s.App.Repository.GetUsernames(c.Request().Context())
+	usernames, err := s.App.Repository.GetUsers(c.Request().Context())
 	if err != nil {
 		return err
 	}
-	return t.ExecuteTemplate(c.Response(), `base`, IndexView{Channels: channels, Usernames: usernames})
+	return t.ExecuteTemplate(c.Response(), `base`, IndexView{Channels: channels, Users: usernames})
 }
 
 func (s *Server) getAdminAddChannel(c echo.Context) error {
@@ -117,57 +118,13 @@ func (s *Server) deleteAdminDeleteChannel(c echo.Context) error {
 	return c.String(http.StatusOK, ``)
 }
 
-func (s *Server) getAdminAddUsername(c echo.Context) error {
-	var t *template.Template
-	sync.OnceFunc(func() {
-		var err error
-		t, err = template.ParseFS(web.F, `templates/layout.gohtml`, `templates/nav.gohtml`, `templates/add_username.gohtml`)
-		if err != nil {
-			sentry.CaptureException(err)
-			log.Fatal().Err(err).Stack().Msg(`error parsing templates`)
-		}
-	})()
-	return t.ExecuteTemplate(c.Response(), `base`, AddUsername{})
-}
-
-func (s *Server) postAdminAddUsername(c echo.Context) error {
-	var t *template.Template
-	sync.OnceFunc(func() {
-		var err error
-		t, err = template.ParseFS(web.F, `templates/layout.gohtml`, `templates/nav.gohtml`, `templates/add_username.gohtml`)
-		if err != nil {
-			sentry.CaptureException(err)
-			log.Fatal().Err(err).Stack().Msg(`error parsing templates`)
-		}
-	})()
-	addUsername := &AddUsername{}
-	err := c.Bind(addUsername)
+func (s *Server) deleteAdminDeleteUser(c echo.Context) error {
+	userChannel := &DeleteUser{}
+	err := c.Bind(userChannel)
 	if err != nil {
 		return err
 	}
-	addUsername.Trim()
-	if !addUsername.Validate() {
-		return t.ExecuteTemplate(c.Response(), `base`, addUsername)
-	}
-	id, err := uuid.NewUUID()
-	if err != nil {
-		return err
-	}
-	username := &chat.Username{ID: id, Name: addUsername.Name, CreatedAt: time.Now()}
-	if err = s.App.Repository.SaveUsername(c.Request().Context(), username); err != nil {
-		return err
-	}
-	s.App.AddUsername(username)
-	return c.Redirect(http.StatusSeeOther, `/`)
-}
-
-func (s *Server) deleteAdminDeleteUsername(c echo.Context) error {
-	deleteChannel := &DeleteChannel{}
-	err := c.Bind(deleteChannel)
-	if err != nil {
-		return err
-	}
-	idString := strings.TrimSpace(deleteChannel.ID)
+	idString := strings.TrimSpace(userChannel.ID)
 	if idString == `` {
 		return errors.New(`invalid request`)
 	}
@@ -175,11 +132,11 @@ func (s *Server) deleteAdminDeleteUsername(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	username, err := s.App.Repository.GetUsername(c.Request().Context(), id)
+	username, err := s.App.Repository.GetUser(c.Request().Context(), id)
 	if err != nil {
 		return err
 	}
-	err = s.App.Repository.DeleteUsername(c.Request().Context(), id)
+	err = s.App.Repository.DeleteUser(c.Request().Context(), id)
 	if err != nil {
 		return err
 	}

@@ -1,4 +1,4 @@
-package irc
+package twitch
 
 import (
 	"context"
@@ -16,7 +16,7 @@ func NewMessagePipeline(client *twitch.Client) chat.GetMessageStream {
 			err := client.Connect()
 			if err != nil {
 				sentry.CaptureException(err)
-				log.Err(err).Msg(`error while connect twitch irc client`)
+				log.Err(err).Msg(`error while connect twitch twitch client`)
 			}
 			clientDone <- struct{}{}
 		}()

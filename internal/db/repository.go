@@ -3,11 +3,15 @@ package db
 import (
 	"context"
 	"database/sql"
+	_ "embed"
 	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/zain-saqer/twitch-chatgpt/internal/chat"
 	"time"
 )
+
+//go:embed init.sql
+var initSql string
 
 type SqliteRepository struct {
 	db *sql.DB
@@ -20,7 +24,7 @@ func NewRepository(db *sql.DB) *SqliteRepository {
 }
 
 func (repo *SqliteRepository) PrepareDatabase(ctx context.Context) error {
-	_, err := repo.db.ExecContext(ctx, `create table if not exists channel (id  TEXT, name TEXT NOT NULL, createdAt  TEXT NOT NULL); create table if not exists user (id TEXT, username TEXT NOT NULL, access_token TEXT NOT NULL, refresh_token TEXT NOT NULL, expires_at TEXT NOT NULL, created_at  TEXT NOT NULL);`)
+	_, err := repo.db.ExecContext(ctx, initSql)
 	if err != nil {
 		return err
 	}
