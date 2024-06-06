@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/zain-saqer/twitch-chatgpt/internal/bot"
 	"github.com/zain-saqer/twitch-chatgpt/internal/chat"
+	"github.com/zain-saqer/twitch-chatgpt/internal/chatgpt"
 	"github.com/zain-saqer/twitch-chatgpt/internal/db"
 	twitch2 "github.com/zain-saqer/twitch-chatgpt/internal/twitch"
 	"golang.org/x/oauth2"
@@ -54,12 +55,14 @@ func main() {
 		log.Fatal().Err(err).Stack().Msg(`error while preparing clickhouse database`)
 	}
 	twitchApi := bot.NewTwitchApiCaller(twitch2.NewApi(config.Oauth2ClientID, &http.Client{}), repo)
+	chatGPTAPI := chatgpt.NewAPI(&http.Client{}, config.ChatGPTSystemMessage, config.ChatGPTModel, config.OpenAIAPIKey)
 	app := &bot.App{
 		Repository:     repo,
 		TwitchClient:   twitchIrcClient,
 		Users:          map[string]*chat.User{},
-		ChannelsByUser: make(map[string]map[string]bool),
+		ChannelsByUser: make(map[*chat.User]map[string]*chat.Channel),
 		TwitterAPI:     twitchApi,
+		ChatGPTAPI:     chatGPTAPI,
 	}
 	if err := app.StartMessagePipeline(ctx); err != nil {
 		sentry.CaptureException(err)

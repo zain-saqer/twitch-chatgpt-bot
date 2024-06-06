@@ -137,17 +137,19 @@ func (api *API) SendMessage(ctx context.Context, user *chat.User, broadcasterId 
 		return nil, err
 	}
 	reqBody := bytes.NewReader(reqBodyStr)
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.twitch.tv/helix/chat/messages", reqBody)
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.twitch.tv/helix/chat/messages", reqBody)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+user.AccessToken)
+	req.Header.Set("Client-Id", api.clientId)
+	req.Header.Set("Content-Type", "application/json")
 	resp, err := api.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusUnauthorized {
+	if resp.StatusCode == http.StatusUnauthorized {
 		return nil, ErrUnauthorized
 	}
 	if resp.StatusCode != http.StatusOK {

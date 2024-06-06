@@ -2,7 +2,7 @@ package chat
 
 import (
 	"context"
-	"fmt"
+	"github.com/rs/zerolog/log"
 	"slices"
 	"strings"
 )
@@ -33,9 +33,11 @@ func FilterMessageStream(ctx context.Context, messageStream <-chan *Message, all
 }
 
 type FindUser func(username string) *User
-type IsUserChannel func(username, channelName string) bool
+type FindChannel func(user *User, channelName string) *Channel
+type SendMessage func(ctx context.Context, user *User, channel *Channel, message string) error
+type GPT func(ctx context.Context, query string) (string, error)
 
-func ServeMessageStream(ctx context.Context, messagesStream <-chan *Message, findUser FindUser, isUserChannel IsUserChannel) {
+func ServeMessageStream(ctx context.Context, messagesStream <-chan *Message, findUser FindUser, findChannel FindChannel, sendMessage SendMessage, gpt GPT) {
 	go func() {
 		for {
 			select {
@@ -43,10 +45,17 @@ func ServeMessageStream(ctx context.Context, messagesStream <-chan *Message, fin
 				return
 			case message := <-messagesStream:
 				user := findUser(message.Username)
-				if user == nil || !isUserChannel(user.Username, message.ChannelName) {
+				channel := findChannel(user, message.ChannelName)
+				if user == nil || channel == nil {
 					continue
 				}
-				fmt.Println(message.Message)
+				answer, err := gpt(ctx, strings.TrimPrefix(message.Message, "!!!"))
+				if err != nil {
+					log.Err(err).Msg("gpt query failed")
+				}
+				if err := sendMessage(ctx, user, channel, answer); err != nil {
+					log.Err(err).Msg(`error while sending a twitch message`)
+				}
 			}
 		}
 	}()

@@ -4,6 +4,7 @@ import (
 	"context"
 	twitchirc "github.com/gempir/go-twitch-irc/v4"
 	"github.com/zain-saqer/twitch-chatgpt/internal/chat"
+	"github.com/zain-saqer/twitch-chatgpt/internal/chatgpt"
 	"github.com/zain-saqer/twitch-chatgpt/internal/twitch"
 	"sync"
 )
@@ -13,8 +14,9 @@ type App struct {
 	TwitchClient   *twitchirc.Client
 	lock           sync.Mutex
 	Users          map[string]*chat.User
-	ChannelsByUser map[string]map[string]bool
+	ChannelsByUser map[*chat.User]map[string]*chat.Channel
 	TwitterAPI     *TwitchApiCaller
+	ChatGPTAPI     *chatgpt.API
 }
 
 func (a *App) JoinChannel(channel ...string) {
@@ -28,31 +30,34 @@ func (a *App) Depart(channel string) {
 func (a *App) AddUser(user *chat.User) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
+	if _, ok := a.Users[user.Username]; ok {
+		return
+	}
 	a.Users[user.Username] = user
-	a.ChannelsByUser[user.Username] = make(map[string]bool)
+	a.ChannelsByUser[user] = make(map[string]*chat.Channel)
 }
 
 func (a *App) RemoveUser(user *chat.User) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	delete(a.Users, user.Username)
-	delete(a.ChannelsByUser, user.Username)
+	delete(a.ChannelsByUser, user)
 }
 
 func (a *App) AddChannel(user *chat.User, channel *chat.Channel) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
-	a.ChannelsByUser[user.Username][channel.Name] = true
+	a.ChannelsByUser[user][channel.Name] = channel
 	a.JoinChannel(channel.Name)
 }
 
 func (a *App) RemoveChannel(user *chat.User, channel *chat.Channel) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
-	if _, ok := a.ChannelsByUser[user.Username]; !ok {
+	if _, ok := a.ChannelsByUser[user]; !ok {
 		return
 	}
-	delete(a.ChannelsByUser[user.Username], channel.Name)
+	delete(a.ChannelsByUser[user], channel.Name)
 	a.Depart(channel.Name)
 }
 
@@ -62,13 +67,26 @@ func (a *App) findUser(username string) *chat.User {
 	return a.Users[username]
 }
 
-func (a *App) isUserChannel(username, channelName string) bool {
+func (a *App) findChannel(user *chat.User, channelName string) *chat.Channel {
 	a.lock.Lock()
 	defer a.lock.Unlock()
-	if _, ok := a.ChannelsByUser[username]; !ok {
-		return false
+	if _, ok := a.ChannelsByUser[user]; !ok {
+		return nil
 	}
-	return a.ChannelsByUser[username][channelName]
+	return a.ChannelsByUser[user][channelName]
+}
+
+func (a *App) sendTwitchMessage(ctx context.Context, user *chat.User, channel *chat.Channel, message string) error {
+	_, err := a.TwitterAPI.SendMessage(ctx, user, channel.ID, message)
+	return err
+}
+
+func (a *App) gpt(ctx context.Context, query string) (string, error) {
+	answer, err := a.ChatGPTAPI.Completions(ctx, query)
+	if err != nil {
+		return "", err
+	}
+	return answer, nil
 }
 
 func (a *App) StartMessagePipeline(ctx context.Context) error {
@@ -94,6 +112,6 @@ func (a *App) StartMessagePipeline(ctx context.Context) error {
 		return err
 	}
 	filteredMessageStream := chat.FilterMessageStream(ctx, messageStream, messageTypes)
-	chat.ServeMessageStream(ctx, filteredMessageStream, a.findUser, a.isUserChannel)
+	chat.ServeMessageStream(ctx, filteredMessageStream, a.findUser, a.findChannel, a.sendTwitchMessage, a.gpt)
 	return nil
 }

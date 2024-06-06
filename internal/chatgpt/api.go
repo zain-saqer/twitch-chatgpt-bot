@@ -2,6 +2,7 @@ package chatgpt
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -38,10 +39,10 @@ type completionObject struct {
 	Choices []*choice `json:"choices"`
 }
 
-func (a *API) completions(q string) (answer string, err error) {
+func (a *API) Completions(ctx context.Context, q string) (answer string, err error) {
 	messages := []*message{
 		{Role: "system", Content: a.systemMessage},
-		{Role: "system", Content: q},
+		{Role: "user", Content: q},
 	}
 	completion := &completion{Model: a.model, Messages: messages}
 	bodyBytes, err := json.Marshal(completion)
@@ -49,7 +50,7 @@ func (a *API) completions(q string) (answer string, err error) {
 		return "", err
 	}
 	body := bytes.NewReader(bodyBytes)
-	request, err := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", body)
+	request, err := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/chat/completions", body)
 	if err != nil {
 		return "", err
 	}
