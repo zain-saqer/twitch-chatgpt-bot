@@ -6,23 +6,32 @@ import (
 )
 
 type IndexView struct {
+	Users []*chat.User
+}
+
+type UserView struct {
 	Channels []*chat.Channel
-	Users    []*chat.User
+	UserID   string
 }
 
 type AddChannel struct {
-	Errors []string
-	Name   string `form:"name"`
+	Errors   []string
+	Username string `form:"name"`
+	UserId   string `param:"userId"`
 }
 
 func (c *AddChannel) Trim() {
-	c.Name = strings.TrimSpace(c.Name)
+	c.Username = strings.TrimSpace(c.Username)
+	c.UserId = strings.TrimSpace(c.UserId)
 }
 
 func (c *AddChannel) Validate() bool {
 	errors := make([]string, 0)
-	if c.Name == "" {
+	if c.Username == "" {
 		errors = append(errors, "Username is required")
+	}
+	if c.UserId == "" {
+		errors = append(errors, "UserId is required")
 	}
 	c.Errors = errors
 	return len(errors) == 0

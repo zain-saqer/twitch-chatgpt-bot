@@ -5,12 +5,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog/log"
 	"github.com/zain-saqer/twitch-chatgpt/internal/chat"
-	"github.com/zain-saqer/twitch-chatgpt/internal/twitch"
 	"net/http"
 	"time"
 )
@@ -71,13 +69,12 @@ func (s *Server) getOAuth2Callback(c echo.Context) (err error) {
 	if err != nil {
 		return
 	}
-	twitchApi := twitch.NewApi(token.AccessToken, token.RefreshToken, s.Config.Oauth2ClientID, &http.Client{})
-	twitchUser, err := twitchApi.GetUser()
+	twitchUser, err := s.App.TwitterAPI.GetCurrentUser(c.Request().Context(), token.AccessToken)
 	if err != nil {
 		return err
 	}
 	user := &chat.User{
-		ID:           uuid.New(),
+		ID:           twitchUser.ID,
 		Username:     twitchUser.Login,
 		AccessToken:  token.AccessToken,
 		RefreshToken: token.RefreshToken,
@@ -88,6 +85,7 @@ func (s *Server) getOAuth2Callback(c echo.Context) (err error) {
 	if err != nil {
 		return err
 	}
+	s.App.AddUser(user)
 	err = c.Redirect(http.StatusTemporaryRedirect, "/")
 	if err != nil {
 		log.Err(err).Msg("")

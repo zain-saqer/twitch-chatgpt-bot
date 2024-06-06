@@ -22,7 +22,8 @@ func TestSqliteRepository(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	channel := &chat.Channel{ID: uuid.New(), Name: `Username`, CreatedAt: time.Now()}
+	user := &chat.User{ID: uuid.New().String(), Username: `Username`, CreatedAt: time.Now()}
+	channel := &chat.Channel{ID: uuid.New().String(), Name: `Username`, CreatedAt: time.Now(), UserId: user.ID}
 	t.Run("Test SaveChannel", func(t *testing.T) {
 		err := repo.SaveChannel(context.Background(), channel)
 		if err != nil {
@@ -39,7 +40,7 @@ func TestSqliteRepository(t *testing.T) {
 		}
 	})
 	t.Run("Test GetChannels", func(t *testing.T) {
-		channels, err := repo.GetChannels(context.Background())
+		channels, err := repo.GetChannelsByUser(context.Background(), user.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -50,12 +51,29 @@ func TestSqliteRepository(t *testing.T) {
 			t.Fatal("Expected channel id ", channel.ID, "got ", channels[0].ID)
 		}
 	})
-	t.Run("Test DeleteChannel", func(t *testing.T) {
-		err := repo.DeleteChannel(context.Background(), channel.ID)
+	t.Run("Test GetChannel and DeleteChannel", func(t *testing.T) {
+		channel2, err := repo.GetChannel(context.Background(), channel.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		channels, err := repo.GetChannels(context.Background())
+		if channel2 == nil {
+			t.Fatal("Expected channel got nil")
+		}
+		if channel2.ID != channel.ID {
+			t.Fatal("Expected channel id ", channel.ID, "got ", channel2.ID)
+		}
+		err = repo.DeleteChannel(context.Background(), channel.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		channel2, err = repo.GetChannel(context.Background(), channel.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if channel2 != nil {
+			t.Fatal("Expected channel got nil")
+		}
+		channels, err := repo.GetChannelsByUser(context.Background(), user.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -63,10 +81,8 @@ func TestSqliteRepository(t *testing.T) {
 			t.Fatal("Expected 0 channel, got ", len(channels))
 		}
 	})
-
-	username := &chat.User{ID: uuid.New(), Username: `Username`, CreatedAt: time.Now()}
 	t.Run("Test SaveUser", func(t *testing.T) {
-		err := repo.SaveUser(context.Background(), username)
+		err := repo.SaveUser(context.Background(), user)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -77,10 +93,10 @@ func TestSqliteRepository(t *testing.T) {
 			t.Fatal(err)
 		}
 		if len(usernames) != 1 {
-			t.Fatal("Expected 1 username, got ", len(usernames))
+			t.Fatal("Expected 1 user, got ", len(usernames))
 		}
-		if usernames[0].ID != username.ID {
-			t.Fatal("Expected username id ", username.ID, "got ", usernames[0].ID)
+		if usernames[0].ID != user.ID {
+			t.Fatal("Expected user id ", user.ID, "got ", usernames[0].ID)
 		}
 	})
 }

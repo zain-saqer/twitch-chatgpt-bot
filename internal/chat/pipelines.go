@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 )
 
 type GetMessageStream func(ctx context.Context, messageTypes []uint8) (<-chan *Message, error)
@@ -21,7 +22,7 @@ func FilterMessageStream(ctx context.Context, messageStream <-chan *Message, all
 				if !ok {
 					return
 				}
-				if slices.Contains(allowedTypes, message.MessageType) {
+				if slices.Contains(allowedTypes, message.MessageType) && strings.HasPrefix(message.Message, `!!!`) {
 					filteredMessageStream <- message
 				}
 			}
@@ -31,15 +32,18 @@ func FilterMessageStream(ctx context.Context, messageStream <-chan *Message, all
 	return filteredMessageStream
 }
 
-func ServeMessageStream(ctx context.Context, messagesStream <-chan *Message, getWhiteList func() map[string]*User) {
+type FindUser func(username string) *User
+type IsUserChannel func(username, channelName string) bool
+
+func ServeMessageStream(ctx context.Context, messagesStream <-chan *Message, findUser FindUser, isUserChannel IsUserChannel) {
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case message := <-messagesStream:
-				usernames := getWhiteList()
-				if _, ok := usernames[message.Username]; !ok {
+				user := findUser(message.Username)
+				if user == nil || !isUserChannel(user.Username, message.ChannelName) {
 					continue
 				}
 				fmt.Println(message.Message)

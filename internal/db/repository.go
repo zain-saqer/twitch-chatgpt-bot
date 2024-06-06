@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
-	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/pkg/errors"
 	"github.com/zain-saqer/twitch-chatgpt/internal/chat"
 	"time"
 )
@@ -31,8 +31,8 @@ func (repo *SqliteRepository) PrepareDatabase(ctx context.Context) error {
 	return nil
 }
 
-func (repo *SqliteRepository) GetChannels(ctx context.Context) (channels []*chat.Channel, err error) {
-	rows, err := repo.db.QueryContext(ctx, `select * from channel`)
+func (repo *SqliteRepository) GetChannelsByUser(ctx context.Context, userId string) (channels []*chat.Channel, err error) {
+	rows, err := repo.db.QueryContext(ctx, `select id, username, createdAt from channel where user_id = ?`, userId)
 	if err != nil {
 		return nil, err
 	}
@@ -44,10 +44,10 @@ func (repo *SqliteRepository) GetChannels(ctx context.Context) (channels []*chat
 	}(rows)
 	channels = make([]*chat.Channel, 0)
 	for rows.Next() {
-		var idStr string
+		var id string
 		var name string
 		var createdAtStr string
-		err = rows.Scan(&idStr, &name, &createdAtStr)
+		err = rows.Scan(&id, &name, &createdAtStr)
 		if err != nil {
 			return nil, err
 		}
@@ -55,22 +55,17 @@ func (repo *SqliteRepository) GetChannels(ctx context.Context) (channels []*chat
 		if err != nil {
 			return nil, err
 		}
-		id, err := uuid.Parse(idStr)
-		if err != nil {
-			return nil, err
-		}
-		channels = append(channels, &chat.Channel{ID: id, Name: name, CreatedAt: createdAt})
-		return channels, nil
+		channels = append(channels, &chat.Channel{ID: id, Name: name, UserId: userId, CreatedAt: createdAt})
 	}
 	err = rows.Err()
 	if err != nil {
 		return nil, err
 	}
-	return nil, nil
+	return channels, nil
 }
 
 func (repo *SqliteRepository) SaveChannel(ctx context.Context, channel *chat.Channel) error {
-	stmt, err := repo.db.PrepareContext(ctx, `insert into channel (id, name, createdAt) values (?, ?, ?)`)
+	stmt, err := repo.db.PrepareContext(ctx, `insert into channel (id, username, user_id, createdAt) values (?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -80,14 +75,14 @@ func (repo *SqliteRepository) SaveChannel(ctx context.Context, channel *chat.Cha
 			err = _err
 		}
 	}(stmt)
-	_, err = stmt.Exec(channel.ID.String(), channel.Name, channel.CreatedAt.Format(time.RFC3339))
+	_, err = stmt.Exec(channel.ID, channel.Name, channel.UserId, channel.CreatedAt.Format(time.RFC3339))
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (repo *SqliteRepository) DeleteChannel(ctx context.Context, id uuid.UUID) error {
+func (repo *SqliteRepository) DeleteChannel(ctx context.Context, id string) error {
 	stmt, err := repo.db.PrepareContext(ctx, `delete from channel where id = ?`)
 	if err != nil {
 		return err
@@ -105,8 +100,8 @@ func (repo *SqliteRepository) DeleteChannel(ctx context.Context, id uuid.UUID) e
 	return nil
 }
 
-func (repo *SqliteRepository) GetChannel(ctx context.Context, id uuid.UUID) (channel *chat.Channel, err error) {
-	stmt, err := repo.db.PrepareContext(ctx, `select * from channel where id = ?`)
+func (repo *SqliteRepository) GetChannel(ctx context.Context, id string) (channel *chat.Channel, err error) {
+	stmt, err := repo.db.PrepareContext(ctx, `select username, user_id, createdAt from channel where id = ?`)
 	if err != nil {
 		return nil, err
 	}
@@ -120,22 +115,21 @@ func (repo *SqliteRepository) GetChannel(ctx context.Context, id uuid.UUID) (cha
 	if err != nil {
 		return nil, err
 	}
-	var idStr string
 	var name string
+	var userId string
 	var createdAtStr string
-	err = row.Scan(&idStr, &name, &createdAtStr)
+	err = row.Scan(&name, &userId, &createdAtStr)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	createdAt, err := time.Parse(time.RFC3339, createdAtStr)
 	if err != nil {
 		return nil, err
 	}
-	id, err = uuid.Parse(idStr)
-	if err != nil {
-		return nil, err
-	}
-	channel = &chat.Channel{ID: id, Name: name, CreatedAt: createdAt}
+	channel = &chat.Channel{ID: id, Name: name, UserId: userId, CreatedAt: createdAt}
 	return channel, nil
 }
 
@@ -152,13 +146,13 @@ func (repo *SqliteRepository) GetUsers(ctx context.Context) (users []*chat.User,
 	}(rows)
 	users = make([]*chat.User, 0)
 	for rows.Next() {
-		var idStr string
+		var id string
 		var username string
 		var accessToken string
 		var refreshToken string
 		var expiresAtStr string
 		var createdAtStr string
-		err = rows.Scan(&idStr, &username, &accessToken, &refreshToken, &expiresAtStr, &createdAtStr)
+		err = rows.Scan(&id, &username, &accessToken, &refreshToken, &expiresAtStr, &createdAtStr)
 		if err != nil {
 			return nil, err
 		}
@@ -167,10 +161,6 @@ func (repo *SqliteRepository) GetUsers(ctx context.Context) (users []*chat.User,
 			return nil, err
 		}
 		expiresAt, err := time.Parse(time.RFC3339, expiresAtStr)
-		if err != nil {
-			return nil, err
-		}
-		id, err := uuid.Parse(idStr)
 		if err != nil {
 			return nil, err
 		}
@@ -190,14 +180,14 @@ func (repo *SqliteRepository) SaveUser(ctx context.Context, user *chat.User) err
 			err = _err
 		}
 	}(stmt)
-	_, err = stmt.Exec(user.ID.String(), user.Username, user.AccessToken, user.RefreshToken, user.ExpiresAt.Format(time.RFC3339), user.CreatedAt.Format(time.RFC3339))
+	_, err = stmt.Exec(user.ID, user.Username, user.AccessToken, user.RefreshToken, user.ExpiresAt.Format(time.RFC3339), user.CreatedAt.Format(time.RFC3339))
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (repo *SqliteRepository) DeleteUser(ctx context.Context, id uuid.UUID) error {
+func (repo *SqliteRepository) DeleteUser(ctx context.Context, id string) error {
 	stmt, err := repo.db.PrepareContext(ctx, `delete from user where id = ?`)
 	if err != nil {
 		return err
@@ -215,7 +205,7 @@ func (repo *SqliteRepository) DeleteUser(ctx context.Context, id uuid.UUID) erro
 	return nil
 }
 
-func (repo *SqliteRepository) GetUser(ctx context.Context, id uuid.UUID) (user *chat.User, err error) {
+func (repo *SqliteRepository) GetUser(ctx context.Context, id string) (user *chat.User, err error) {
 	stmt, err := repo.db.PrepareContext(ctx, `select username, access_token, refresh_token, expires_at, created_at from user where id = ?`)
 	if err != nil {
 		return nil, err
@@ -249,4 +239,22 @@ func (repo *SqliteRepository) GetUser(ctx context.Context, id uuid.UUID) (user *
 	}
 	user = &chat.User{ID: id, Username: username, AccessToken: accessToken, RefreshToken: refreshToken, ExpiresAt: expiresAt, CreatedAt: createdAt}
 	return user, nil
+}
+
+func (repo *SqliteRepository) UpdateUser(ctx context.Context, user *chat.User) error {
+	stmt, err := repo.db.PrepareContext(ctx, `update user set username=?, access_token=?, refresh_token=?, expires_at=? where id = ?`)
+	if err != nil {
+		return err
+	}
+	defer func(stmt *sql.Stmt) {
+		_err := stmt.Close()
+		if _err != nil {
+			err = _err
+		}
+	}(stmt)
+	_, err = stmt.Exec(user.Username, user.AccessToken, user.RefreshToken, user.ExpiresAt.Format(time.RFC3339), user.ID)
+	if err != nil {
+		return err
+	}
+	return nil
 }

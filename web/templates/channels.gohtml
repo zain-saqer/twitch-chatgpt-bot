@@ -1,0 +1,24 @@
+{{define `body`}}
+    <div class="container my-5">
+        <div class="row">
+            <div class="col-lg-6">
+                {{template `channels` .}}
+            </div>
+        </div>
+    </div>
+{{end}}
+
+{{define `channels`}}
+    <h3>Channels</h3>
+    <p>
+        <a class="btn btn-secondary btn-sm" href="/{{.UserID}}/add-channel">Add channel</a>
+    </p>
+    <ul>
+        {{range .Channels}}
+            <li>{{.Name}} <button class="btn btn-text" hx-delete="/channels/{{.ID}}">Remove</button></li>
+        {{end}}
+    </ul>
+    {{if not .}}
+        <p class="text-mute">No channels</p>
+    {{end}}
+{{end}}

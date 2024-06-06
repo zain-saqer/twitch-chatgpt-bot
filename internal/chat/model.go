@@ -2,7 +2,6 @@ package chat
 
 import (
 	"context"
-	"github.com/google/uuid"
 	"time"
 )
 
@@ -15,13 +14,14 @@ type Message struct {
 }
 
 type Channel struct {
-	ID        uuid.UUID
+	ID        string
 	Name      string
+	UserId    string
 	CreatedAt time.Time
 }
 
 type User struct {
-	ID           uuid.UUID
+	ID           string
 	Username     string
 	AccessToken  string
 	RefreshToken string
@@ -49,12 +49,13 @@ const (
 )
 
 type Repository interface {
-	GetChannels(ctx context.Context) ([]*Channel, error)
+	GetChannelsByUser(ctx context.Context, userId string) ([]*Channel, error)
 	SaveChannel(ctx context.Context, channel *Channel) error
-	GetChannel(ctx context.Context, id uuid.UUID) (*Channel, error)
-	DeleteChannel(ctx context.Context, id uuid.UUID) error
+	GetChannel(ctx context.Context, id string) (*Channel, error)
+	DeleteChannel(ctx context.Context, id string) error
 	GetUsers(ctx context.Context) ([]*User, error)
 	SaveUser(ctx context.Context, username *User) error
-	DeleteUser(ctx context.Context, id uuid.UUID) error
-	GetUser(ctx context.Context, id uuid.UUID) (user *User, err error)
+	DeleteUser(ctx context.Context, id string) error
+	GetUser(ctx context.Context, id string) (user *User, err error)
+	UpdateUser(ctx context.Context, user *User) error
 }

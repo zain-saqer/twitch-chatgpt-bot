@@ -6,7 +6,6 @@ import (
 	"errors"
 	"github.com/gempir/go-twitch-irc/v4"
 	"github.com/getsentry/sentry-go"
-	"github.com/google/uuid"
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog"
@@ -14,6 +13,7 @@ import (
 	"github.com/zain-saqer/twitch-chatgpt/internal/bot"
 	"github.com/zain-saqer/twitch-chatgpt/internal/chat"
 	"github.com/zain-saqer/twitch-chatgpt/internal/db"
+	twitch2 "github.com/zain-saqer/twitch-chatgpt/internal/twitch"
 	"golang.org/x/oauth2"
 	oauth2Twitch "golang.org/x/oauth2/twitch"
 	"net/http"
@@ -53,12 +53,13 @@ func main() {
 		sentry.CaptureException(err)
 		log.Fatal().Err(err).Stack().Msg(`error while preparing clickhouse database`)
 	}
-
+	twitchApi := bot.NewTwitchApiCaller(twitch2.NewApi(config.Oauth2ClientID, &http.Client{}), repo)
 	app := &bot.App{
-		Repository:    repo,
-		TwitchClient:  twitchIrcClient,
-		Whitelist:     map[string]*chat.User{},
-		WhitelistByID: map[uuid.UUID]*chat.User{},
+		Repository:     repo,
+		TwitchClient:   twitchIrcClient,
+		Users:          map[string]*chat.User{},
+		ChannelsByUser: make(map[string]map[string]bool),
+		TwitterAPI:     twitchApi,
 	}
 	if err := app.StartMessagePipeline(ctx); err != nil {
 		sentry.CaptureException(err)
@@ -75,7 +76,7 @@ func main() {
 	oauth2Config := &oauth2.Config{
 		ClientID:     config.Oauth2ClientID,
 		ClientSecret: config.Oauth2Secret,
-		Scopes:       []string{"user:read:email"},
+		Scopes:       []string{"user:write:chat", "user:read:email"},
 		Endpoint:     oauth2Twitch.Endpoint,
 		RedirectURL:  oauthRedirect,
 	}

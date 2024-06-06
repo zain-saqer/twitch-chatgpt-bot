@@ -1,10 +1,5 @@
 {{define `body`}}
     <div class="container my-5">
-        <div class="row ">
-            <div class="col-lg-6">
-                {{template `channels` .Channels}}
-            </div>
-        </div>
         <div class="row">
             <div class="col-lg-6">
                 {{template `users` .Users}}
@@ -13,29 +8,14 @@
     </div>
 {{end}}
 
-{{define `channels`}}
-    <h3>Channels</h3>
-    <p>
-        <a class="btn btn-secondary btn-sm" href="/add-channel">Add channel</a>
-    </p>
-    <ul>
-        {{range .}}
-            <li>{{.Name}} <button class="btn btn-text" hx-delete="/channels/{{.ID}}">Remove</button></li>
-        {{end}}
-    </ul>
-    {{if not .}}
-        <p class="text-mute">No channels</p>
-    {{end}}
-{{end}}
-
 {{define `users`}}
         <h3>Users</h3>
         <p>
-            <a class="btn btn-secondary btn-sm" href="/add-user">Add channel</a>
+            <a class="btn btn-secondary btn-sm" href="/add-user">Add user</a>
         </p>
     <ul>
         {{range .}}
-            <li>{{.Username}} <button class="btn btn-text" hx-delete="/users/{{.ID}}">Remove</button></li>
+            <li><a href="/{{.ID}}/channels">{{.Username}}</a> <button class="btn btn-text" hx-delete="/users/{{.ID}}">Remove</button></li>
         {{end}}
     </ul>
     {{if not .}}

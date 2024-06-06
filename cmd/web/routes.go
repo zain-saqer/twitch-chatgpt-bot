@@ -2,8 +2,8 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"github.com/getsentry/sentry-go"
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/rs/zerolog/log"
 	"github.com/zain-saqer/twitch-chatgpt/internal/chat"
@@ -18,8 +18,9 @@ import (
 func (s *Server) setupRoutes() {
 	route := s.Echo.Group(`/`, authMiddleware(s.Config))
 	route.GET(``, s.getIndex)
-	route.GET(`add-channel`, s.getAdminAddChannel)
-	route.POST(`add-channel`, s.postAdminAddChannel)
+	route.GET(`:userId/channels`, s.getAdminChannels)
+	route.GET(`:userId/add-channel`, s.getAdminAddChannel)
+	route.POST(`:userId/add-channel`, s.postAdminAddChannel)
 	route.DELETE(`channels/:id`, s.deleteAdminDeleteChannel)
 	route.DELETE(`users/:id`, s.deleteAdminDeleteUser)
 
@@ -37,15 +38,28 @@ func (s *Server) getIndex(c echo.Context) error {
 			log.Fatal().Err(err).Stack().Msg(`error parsing templates`)
 		}
 	})()
-	channels, err := s.App.Repository.GetChannels(c.Request().Context())
-	if err != nil {
-		return err
-	}
 	usernames, err := s.App.Repository.GetUsers(c.Request().Context())
 	if err != nil {
 		return err
 	}
-	return t.ExecuteTemplate(c.Response(), `base`, IndexView{Channels: channels, Users: usernames})
+	return t.ExecuteTemplate(c.Response(), `base`, IndexView{Users: usernames})
+}
+
+func (s *Server) getAdminChannels(c echo.Context) error {
+	var t *template.Template
+	sync.OnceFunc(func() {
+		var err error
+		t, err = template.ParseFS(web.F, `templates/layout.gohtml`, `templates/nav.gohtml`, `templates/channels.gohtml`)
+		if err != nil {
+			sentry.CaptureException(err)
+			log.Fatal().Err(err).Stack().Msg(`error parsing templates`)
+		}
+	})()
+	channels, err := s.App.Repository.GetChannelsByUser(c.Request().Context(), c.Param(`userId`))
+	if err != nil {
+		return err
+	}
+	return t.ExecuteTemplate(c.Response(), `base`, UserView{UserID: c.Param(`userId`), Channels: channels})
 }
 
 func (s *Server) getAdminAddChannel(c echo.Context) error {
@@ -80,15 +94,21 @@ func (s *Server) postAdminAddChannel(c echo.Context) error {
 	if !addChannel.Validate() {
 		return t.ExecuteTemplate(c.Response(), `base`, addChannel)
 	}
-	id, err := uuid.NewUUID()
+	user, err := s.App.Repository.GetUser(c.Request().Context(), addChannel.UserId)
 	if err != nil {
 		return err
 	}
-	if err = s.App.Repository.SaveChannel(c.Request().Context(), &chat.Channel{ID: id, Name: addChannel.Name, CreatedAt: time.Now()}); err != nil {
+
+	twitchChannel, err := s.App.TwitterAPI.GetUser(c.Request().Context(), user.AccessToken, addChannel.Username)
+	if err != nil {
 		return err
 	}
-	s.App.JoinChannel(addChannel.Name)
-	return c.Redirect(http.StatusSeeOther, `/`)
+	channel := &chat.Channel{ID: twitchChannel.ID, UserId: addChannel.UserId, Name: addChannel.Username, CreatedAt: time.Now()}
+	if err = s.App.Repository.SaveChannel(c.Request().Context(), channel); err != nil {
+		return err
+	}
+	s.App.AddChannel(user, channel)
+	return c.Redirect(http.StatusSeeOther, fmt.Sprintf(`/%s/channels`, c.Param(`userId`)))
 }
 
 func (s *Server) deleteAdminDeleteChannel(c echo.Context) error {
@@ -97,13 +117,9 @@ func (s *Server) deleteAdminDeleteChannel(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	idString := strings.TrimSpace(deleteChannel.ID)
-	if idString == `` {
+	id := strings.TrimSpace(deleteChannel.ID)
+	if id == `` {
 		return errors.New(`invalid request`)
-	}
-	id, err := uuid.Parse(idString)
-	if err != nil {
-		return err
 	}
 	channel, err := s.App.Repository.GetChannel(c.Request().Context(), id)
 	if err != nil {
@@ -124,15 +140,11 @@ func (s *Server) deleteAdminDeleteUser(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	idString := strings.TrimSpace(userChannel.ID)
-	if idString == `` {
+	id := strings.TrimSpace(userChannel.ID)
+	if id == `` {
 		return errors.New(`invalid request`)
 	}
-	id, err := uuid.Parse(idString)
-	if err != nil {
-		return err
-	}
-	username, err := s.App.Repository.GetUser(c.Request().Context(), id)
+	user, err := s.App.Repository.GetUser(c.Request().Context(), id)
 	if err != nil {
 		return err
 	}
@@ -140,7 +152,7 @@ func (s *Server) deleteAdminDeleteUser(c echo.Context) error {
 	if err != nil {
 		return err
 	}
-	s.App.RemoveUsername(username)
+	s.App.RemoveUser(user)
 	c.Response().Header().Add(`HX-Refresh`, `true`)
 	return c.String(http.StatusOK, ``)
 }
