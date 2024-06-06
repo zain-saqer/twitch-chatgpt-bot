@@ -10,7 +10,7 @@ RUN go mod download && go mod verify
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o /chatlog ./cmd/web
+RUN GOOS=linux go build -o /twitch-chatgpt-bot-server ./cmd/web
 
 # Run the tests in the container
 FROM build-stage AS run-test-stage
@@ -21,6 +21,6 @@ FROM gcr.io/distroless/base-debian12 AS build-release-stage
 
 WORKDIR /
 
-COPY --from=build-stage /chatlog /app
+COPY --from=build-stage /twitch-chatgpt-bot-server /app
 
 ENTRYPOINT ["/app"]

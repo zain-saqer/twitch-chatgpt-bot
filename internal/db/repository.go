@@ -188,18 +188,20 @@ func (repo *SqliteRepository) SaveUser(ctx context.Context, user *chat.User) err
 }
 
 func (repo *SqliteRepository) DeleteUser(ctx context.Context, id string) error {
-	stmt, err := repo.db.PrepareContext(ctx, `delete from user where id = ?`)
+	tx, err := repo.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	defer func(stmt *sql.Stmt) {
-		_err := stmt.Close()
-		if _err != nil {
-			err = _err
-		}
-	}(stmt)
-	_, err = stmt.Exec(id)
+	defer tx.Rollback()
+	_, err = tx.ExecContext(ctx, `delete from channel where user_id = ?`, id)
 	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, `delete from user where id = ?`, id)
+	if err != nil {
+		return err
+	}
+	if err = tx.Commit(); err != nil {
 		return err
 	}
 	return nil

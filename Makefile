@@ -14,10 +14,10 @@ pull-image:
 	@docker image pull ${APP_IMAGE}
 
 up:
-	@docker stack deploy --compose-file=docker-stack.yml twitch-chatgpt
+	@docker stack deploy --compose-file=docker-stack.yml twitch-chatgpt-bot
 
 down:
-	@docker stack down twitch-chatgpt
+	@docker stack down twitch-chatgpt-bot
 
 app-service-logs:
-	@docker service logs twitch-chatgpt_app
+	@docker service logs twitch-chatgpt-bot_app

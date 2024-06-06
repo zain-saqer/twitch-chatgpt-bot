@@ -14,7 +14,7 @@ type App struct {
 	TwitchClient   *twitchirc.Client
 	lock           sync.Mutex
 	Users          map[string]*chat.User
-	ChannelsByUser map[*chat.User]map[string]*chat.Channel
+	ChannelsByUser map[string]map[string]*chat.Channel
 	TwitterAPI     *TwitchApiCaller
 	ChatGPTAPI     *chatgpt.API
 }
@@ -34,30 +34,30 @@ func (a *App) AddUser(user *chat.User) {
 		return
 	}
 	a.Users[user.Username] = user
-	a.ChannelsByUser[user] = make(map[string]*chat.Channel)
+	a.ChannelsByUser[user.Username] = make(map[string]*chat.Channel)
 }
 
 func (a *App) RemoveUser(user *chat.User) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 	delete(a.Users, user.Username)
-	delete(a.ChannelsByUser, user)
+	delete(a.ChannelsByUser, user.Username)
 }
 
 func (a *App) AddChannel(user *chat.User, channel *chat.Channel) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
-	a.ChannelsByUser[user][channel.Name] = channel
+	a.ChannelsByUser[user.Username][channel.Name] = channel
 	a.JoinChannel(channel.Name)
 }
 
 func (a *App) RemoveChannel(user *chat.User, channel *chat.Channel) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
-	if _, ok := a.ChannelsByUser[user]; !ok {
+	if _, ok := a.ChannelsByUser[user.Username]; !ok {
 		return
 	}
-	delete(a.ChannelsByUser[user], channel.Name)
+	delete(a.ChannelsByUser[user.Username], channel.Name)
 	a.Depart(channel.Name)
 }
 
@@ -70,10 +70,10 @@ func (a *App) findUser(username string) *chat.User {
 func (a *App) findChannel(user *chat.User, channelName string) *chat.Channel {
 	a.lock.Lock()
 	defer a.lock.Unlock()
-	if _, ok := a.ChannelsByUser[user]; !ok {
+	if _, ok := a.ChannelsByUser[user.Username]; !ok {
 		return nil
 	}
-	return a.ChannelsByUser[user][channelName]
+	return a.ChannelsByUser[user.Username][channelName]
 }
 
 func (a *App) sendTwitchMessage(ctx context.Context, user *chat.User, channel *chat.Channel, message string) error {

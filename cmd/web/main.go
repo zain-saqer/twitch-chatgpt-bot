@@ -52,7 +52,7 @@ func main() {
 	repo := db.NewRepository(database)
 	if err := repo.PrepareDatabase(ctx); err != nil {
 		sentry.CaptureException(err)
-		log.Fatal().Err(err).Stack().Msg(`error while preparing clickhouse database`)
+		log.Fatal().Err(err).Stack().Msg(`error while preparing database`)
 	}
 	twitchApi := bot.NewTwitchApiCaller(twitch2.NewApi(config.Oauth2ClientID, &http.Client{}), repo)
 	chatGPTAPI := chatgpt.NewAPI(&http.Client{}, config.ChatGPTSystemMessage, config.ChatGPTModel, config.OpenAIAPIKey)
@@ -60,7 +60,7 @@ func main() {
 		Repository:     repo,
 		TwitchClient:   twitchIrcClient,
 		Users:          map[string]*chat.User{},
-		ChannelsByUser: make(map[*chat.User]map[string]*chat.Channel),
+		ChannelsByUser: make(map[string]map[string]*chat.Channel),
 		TwitterAPI:     twitchApi,
 		ChatGPTAPI:     chatGPTAPI,
 	}
