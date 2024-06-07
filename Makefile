@@ -19,5 +19,5 @@ up:
 down:
 	@docker stack down twitch-chatgpt-bot
 
-app-service-logs:
+logs:
 	@docker service logs twitch-chatgpt-bot_app
